@@ -1,19 +1,13 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  Send, 
-  Receipt, 
-  ShieldCheck, 
-  LogOut, 
-  X,
-  CreditCard,
-  CalendarPlus,
-  Scale,
-  HandCoins,
-  TrendingUp,
-  StickyNote
+  LayoutDashboard, Send, Receipt, ShieldCheck, LogOut, X,
+  CreditCard, CalendarPlus, Scale, HandCoins, TrendingUp, StickyNote
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// FIREBASE AUTH IMPORT
+import { auth } from '../lib/firebase';
+import { signOut } from 'firebase/auth';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -25,9 +19,17 @@ interface SidebarProps {
 const Sidebar = ({ isOpen, isMobileOpen, setIsMobileOpen }: SidebarProps) => {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
-    navigate('/login');
+  // Updated Logout Function
+  const handleLogout = async () => {
+    try {
+      if (window.confirm("Are you sure you want to logout?")) {
+        await signOut(auth); // Firebase se logout karein
+        localStorage.removeItem('isLoggedIn'); // Purana data clean karein
+        navigate('/login');
+      }
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
   };
 
   const navItems = [
@@ -45,23 +47,21 @@ const Sidebar = ({ isOpen, isMobileOpen, setIsMobileOpen }: SidebarProps) => {
   return (
     <>
       <aside 
-        className={`fixed top-0 left-0 h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200 z-50 sidebar-transition hidden lg:flex flex-col
+        className={`fixed top-0 left-0 h-screen bg-white/80 backdrop-blur-xl border-r border-slate-200 z-50 transition-all duration-300 hidden lg:flex flex-col
           ${isOpen ? 'w-64' : 'w-20'}
         `}
       >
         <div className="h-20 flex items-center px-6 gap-3 border-b border-slate-50">
-          <div className="h-10 w-10 min-w-[40px] rounded-xl gradient-indigo flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+          <div className="h-10 w-10 min-w-[40px] rounded-xl gradient-indigo flex items-center justify-center text-white shadow-lg">
             <CreditCard size={20} />
           </div>
           <AnimatePresence>
             {isOpen && (
               <motion.span 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
                 className="font-black text-xl gradient-text tracking-tight uppercase"
               >
-                FinTrack
+                FundManage
               </motion.span>
             )}
           </AnimatePresence>
@@ -73,47 +73,19 @@ const Sidebar = ({ isOpen, isMobileOpen, setIsMobileOpen }: SidebarProps) => {
               key={item.path}
               to={item.path}
               className={({ isActive }) => `
-                flex items-center gap-4 px-3 py-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden
-                ${isActive 
-                  ? 'sidebar-item-active shadow-indigo-500/10' 
-                  : 'text-slate-500 hover:bg-slate-50/80 hover:text-indigo-600'
-                }
+                flex items-center gap-4 px-3 py-3.5 rounded-xl transition-all group relative overflow-hidden
+                ${isActive ? 'bg-indigo-50/50 text-indigo-600 shadow-sm shadow-indigo-100' : 'text-slate-500 hover:bg-slate-50/80 hover:text-indigo-600'}
               `}
               title={!isOpen ? item.label : ''}
             >
-              {({ isActive }) => (
-                <>
-                  <item.icon 
-                    size={22} 
-                    className={`
-                      transition-all duration-300 group-hover:scale-110 relative z-10
-                      ${isActive ? item.activeIcon : item.color}
-                    `} 
-                  />
-                  <AnimatePresence>
-                    {isOpen && (
-                      <motion.span 
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
-                        className="font-bold text-sm whitespace-nowrap relative z-10"
-                      >
-                        {item.label}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Active highlight background glow */}
-                  {isActive && (
-                    <motion.div 
-                      layoutId="active-bg"
-                      className="absolute inset-0 bg-indigo-500/5 z-0"
-                    />
-                  )}
-
-                  {/* Hover highlight line */}
-                  <div className="absolute inset-y-0 left-0 w-1 bg-transparent group-hover:bg-indigo-500 transition-all rounded-r-full" />
-                </>
+              <item.icon size={22} className={`transition-all group-hover:scale-110 relative z-10`} />
+              {isOpen && (
+                <motion.span 
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="font-bold text-sm whitespace-nowrap relative z-10"
+                >
+                  {item.label}
+                </motion.span>
               )}
             </NavLink>
           ))}
@@ -122,24 +94,11 @@ const Sidebar = ({ isOpen, isMobileOpen, setIsMobileOpen }: SidebarProps) => {
         <div className="p-4 border-t border-slate-50">
           <button
             onClick={handleLogout}
-            className={`
-              flex items-center gap-4 px-3 py-3 w-full rounded-xl text-rose-500 hover:bg-rose-50 transition-all group
-            `}
+            className="flex items-center gap-4 px-3 py-3 w-full rounded-xl text-rose-500 hover:bg-rose-50 transition-all group"
             title={!isOpen ? 'Logout' : ''}
           >
             <LogOut size={22} className="group-hover:translate-x-1 transition-transform" />
-            <AnimatePresence>
-              {isOpen && (
-                <motion.span 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  className="font-semibold text-sm"
-                >
-                  Logout
-                </motion.span>
-              )}
-            </AnimatePresence>
+            {isOpen && <span className="font-semibold text-sm">Logout</span>}
           </button>
         </div>
       </aside>
@@ -148,25 +107,17 @@ const Sidebar = ({ isOpen, isMobileOpen, setIsMobileOpen }: SidebarProps) => {
       <AnimatePresence>
         {isMobileOpen && (
           <motion.aside 
-            initial={{ x: '-100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
             className="fixed top-0 left-0 h-screen w-72 bg-white z-[60] flex flex-col lg:hidden shadow-2xl"
           >
             <div className="h-20 flex items-center justify-between px-6 border-b border-slate-50">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl gradient-indigo flex items-center justify-center text-white shadow-lg">
+                <div className="h-10 w-10 rounded-xl gradient-indigo flex items-center justify-center text-white">
                   <CreditCard size={20} />
                 </div>
-                <span className="font-bold text-xl gradient-text">FinTrack</span>
+                <span className="font-bold text-xl gradient-text">FundManage</span>
               </div>
-              <button 
-                onClick={() => setIsMobileOpen(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg text-slate-500"
-              >
-                <X size={20} />
-              </button>
+              <button onClick={() => setIsMobileOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-500"><X size={20} /></button>
             </div>
 
             <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
@@ -175,13 +126,7 @@ const Sidebar = ({ isOpen, isMobileOpen, setIsMobileOpen }: SidebarProps) => {
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsMobileOpen(false)}
-                  className={({ isActive }) => `
-                    flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all
-                    ${isActive 
-                      ? 'sidebar-item-active' 
-                      : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'
-                    }
-                  `}
+                  className={({ isActive }) => `flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
                 >
                   <item.icon size={22} />
                   <span className="font-semibold">{item.label}</span>

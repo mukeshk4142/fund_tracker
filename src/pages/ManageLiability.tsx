@@ -46,7 +46,7 @@ const ManageLiability = () => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      maximumFractionDigits: 2
+      maximumFractionDigits: 0
     }).format(amt);
   };
 
@@ -69,7 +69,9 @@ const ManageLiability = () => {
     e.preventDefault();
     try {
       const amount = Math.round(parseFloat(newAmount) * 100) / 100;
-      const newLiability = {
+      
+      // 1. Save to main liability collection
+      await addDoc(collection(db, 'liability_obligations'), {
         name: newName,
         amount: amount,
         paid: 0,
@@ -77,9 +79,20 @@ const ManageLiability = () => {
         remarks: newRemarks,
         status: 'active',
         createdAt: serverTimestamp()
-      };
+      });
 
-      await addDoc(collection(db, 'liability_obligations'), newLiability);
+      // 2. Log to Global Activity (Unified Log)
+      await addDoc(collection(db, 'global_activities'), {
+        type: 'borrow',
+        category: 'Liability Added',
+        name: newName,
+        amount: amount,
+        date: newDate,
+        source: 'Liability',
+        remarks: `Borrowed from ${newName}: ${newRemarks}`,
+        createdAt: serverTimestamp()
+      });
+
       setShowAddModal(false);
       setNewName(''); setNewAmount(''); setNewRemarks('');
     } catch (error) {
@@ -87,7 +100,7 @@ const ManageLiability = () => {
     }
   };
 
-  // RECORD PAYMENT
+  // RECORD PAYMENT (Repayment)
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     const payAmt = Math.round(parseFloat(paymentAmount) * 100) / 100;
@@ -105,13 +118,14 @@ const ManageLiability = () => {
 
         // Log transition to global history
         await addDoc(collection(db, 'global_activities'), {
-          type: 'expense',
-          category: 'Liability Payment',
+          type: 'payment', // Marked as payment so it shows correctly in reports
+          category: 'Liability Repayment',
           name: liability.name,
           amount: payAmt,
           date: paymentDate,
           remarks: paymentRemarks,
-          source: 'Liability'
+          source: 'Liability',
+          createdAt: serverTimestamp()
         });
 
         setShowPaymentModal(false);
@@ -230,7 +244,7 @@ const ManageLiability = () => {
         </div>
       </div>
 
-      {/* MODALS (Simplified for brevity) */}
+      {/* MODALS */}
       <AnimatePresence>
         {showAddModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -239,7 +253,7 @@ const ManageLiability = () => {
               <h3 className="text-xl font-black text-white mb-6">New Liability</h3>
               <form onSubmit={handleAddLiability} className="space-y-4">
                 <input type="text" placeholder="Lender Name" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none font-bold" required />
-                <input type="number" step="0.01" placeholder="Borrowed Amount" value={newAmount} onChange={e => setNewAmount(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none font-black" required />
+                <input type="number" step="0.01" placeholder="Borrowed Amount (₹)" value={newAmount} onChange={e => setNewAmount(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none font-black" required />
                 <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none font-bold" required />
                 <textarea placeholder="Remarks" value={newRemarks} onChange={e => setNewRemarks(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none h-24" />
                 <button type="submit" className="w-full py-4 gradient-indigo text-white font-black rounded-xl uppercase tracking-widest text-xs">Save to Cloud</button>
@@ -260,9 +274,9 @@ const ManageLiability = () => {
                     <option key={l.id} value={l.id}>{l.name} (Bal: {formatINR(l.amount - l.paid)})</option>
                   ))}
                 </select>
-                <input type="number" step="0.01" placeholder="Amount Paid" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none font-black" required />
+                <input type="number" step="0.01" placeholder="Amount Paid (₹)" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none font-black" required />
                 <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none font-bold" required />
-                <button type="submit" className="w-full py-4 gradient-emerald text-white font-black rounded-xl uppercase tracking-widest text-xs">Record Payment</button>
+                <button type="submit" className="w-full py-4 gradient-emerald text-white font-black rounded-xl uppercase tracking-widest text-xs">Confirm Repayment</button>
               </form>
             </motion.div>
           </div>

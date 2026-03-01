@@ -66,7 +66,6 @@ const DailyTransition = () => {
     if (!newAmount || !newCategory) return;
 
     try {
-      // Fix: Rounding to 2 decimal places to prevent calculation differences
       const cleanAmount = Math.round(parseFloat(newAmount) * 100) / 100;
 
       const txData = {
@@ -78,7 +77,19 @@ const DailyTransition = () => {
         createdAt: serverTimestamp()
       };
 
+      // 1. Save to daily_activities collection
       await addDoc(collection(db, 'daily_activities'), txData);
+
+      // 2. Sync to Global Activity (Unified Log for Reports)
+      await addDoc(collection(db, 'global_activities'), {
+        type: newType,
+        category: newCategory,
+        amount: cleanAmount,
+        date: newDate,
+        source: 'Daily', // Important for filtering in Global Activity Page
+        remarks: newNote,
+        createdAt: serverTimestamp()
+      });
 
       setShowAddModal(false);
       setNewCategory(''); setNewAmount(''); setNewNote('');
@@ -91,6 +102,8 @@ const DailyTransition = () => {
     if (window.confirm("Are you sure you want to delete this entry?")) {
       try {
         await deleteDoc(doc(db, 'daily_activities', id));
+        // Note: Manual deletion from global_activities is usually handled 
+        // by a cloud function or searching by a reference ID if needed.
       } catch (error) {
         console.error("Error deleting document: ", error);
       }

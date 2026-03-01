@@ -14,7 +14,7 @@ import {
 
 interface StockTransaction {
   id: string;
-  type: 'withdrawal' | 'deposit'; // Standardized to match Dashboard
+  type: 'withdrawal' | 'deposit'; 
   amount: number;
   date: string;
   remark: string;
@@ -62,7 +62,6 @@ const StockIncome: React.FC = () => {
     if (!formData.amount) return;
 
     try {
-      // Precision Fix: Rounding to 2 decimal places
       const cleanAmount = Math.round(parseFloat(formData.amount) * 100) / 100;
 
       const newTx = {
@@ -73,7 +72,19 @@ const StockIncome: React.FC = () => {
         createdAt: serverTimestamp()
       };
 
+      // 1. Save to stock_activities collection
       await addDoc(collection(db, 'stock_activities'), newTx);
+
+      // 2. Sync to Global Activity (Unified Report Hub)
+      await addDoc(collection(db, 'global_activities'), {
+        type: formData.type === 'withdrawal' ? 'income' : 'expense',
+        category: `Stock ${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)}`,
+        amount: cleanAmount,
+        date: formData.date,
+        source: 'Stock', // Essential for Global filtering
+        remarks: formData.remark,
+        createdAt: serverTimestamp()
+      });
       
       setShowModal(false);
       setFormData({
@@ -117,7 +128,7 @@ const StockIncome: React.FC = () => {
             <TrendingUp className="text-indigo-600 h-8 w-8" />
             Stock Income
           </h1>
-          <p className="text-slate-500 font-medium">{loading ? 'Syncing with Cloud...' : 'Manage your market cashflow'}</p>
+          <p className="text-slate-500 font-medium">{loading ? 'Syncing...' : 'Manage market withdrawals & deposits'}</p>
         </div>
         <button 
           onClick={() => setShowModal(true)}
@@ -129,7 +140,7 @@ const StockIncome: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-100/50">
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600"><ArrowUpCircle size={24} /></div>
             <span className="font-bold text-slate-500 uppercase text-xs">Total Withdrawals</span>
@@ -139,7 +150,7 @@ const StockIncome: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-100/50">
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 bg-rose-50 rounded-xl text-rose-600"><ArrowDownCircle size={24} /></div>
             <span className="font-bold text-slate-500 uppercase text-xs">Total Deposits</span>
@@ -160,13 +171,13 @@ const StockIncome: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-100/50 overflow-hidden">
-        <div className="p-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
+        <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
           <h2 className="text-xl font-black text-slate-900 tracking-tight">Cloud History</h2>
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              <input type="text" placeholder="Search remark..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none w-full sm:w-64 font-medium" />
             </div>
             <div className="flex bg-white p-1 rounded-xl border border-slate-200">
@@ -195,11 +206,10 @@ const StockIncome: React.FC = () => {
             <tbody className="divide-y divide-slate-50">
               <AnimatePresence mode="popLayout">
                 {filteredTransactions.map((t) => (
-                  <motion.tr key={t.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hover:bg-slate-50/50 transition-colors group">
+                  <motion.tr key={t.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${t.type === 'withdrawal' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                        {t.type === 'withdrawal' ? <ArrowUpCircle size={12} /> : <ArrowDownCircle size={12} />}
-                        {t.type}
+                        {t.type === 'withdrawal' ? 'Withdrawal' : 'Deposit'}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -217,7 +227,7 @@ const StockIncome: React.FC = () => {
               </AnimatePresence>
             </tbody>
           </table>
-          {filteredTransactions.length === 0 && <p className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-sm">No activity found</p>}
+          {filteredTransactions.length === 0 && <p className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-sm italic">No records found</p>}
         </div>
       </div>
 
@@ -226,11 +236,7 @@ const StockIncome: React.FC = () => {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="fixed inset-0 bg-slate-900/40 backdrop-blur-md" />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl p-8">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Add Stock Activity</h3>
-                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={24} className="text-slate-400" /></button>
-              </div>
-
+              <h3 className="text-2xl font-black text-slate-900 mb-8 tracking-tight">Add Stock Activity</h3>
               <form onSubmit={handleAddTransaction} className="space-y-6">
                 <div className="flex gap-4 p-1 bg-slate-50 rounded-2xl border">
                   <button type="button" onClick={() => setFormData({...formData, type: 'withdrawal'})}
@@ -241,15 +247,15 @@ const StockIncome: React.FC = () => {
                   >DEPOSIT</button>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Amount (₹)</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Amount (₹)</label>
                   <input type="number" step="0.01" required value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})}
                     className="w-full px-6 py-4 bg-slate-50 border rounded-2xl outline-none font-black text-lg focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="0.00" />
                 </div>
                 <input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})}
                   className="w-full px-6 py-4 bg-slate-50 border rounded-2xl font-bold text-slate-600 outline-none" />
                 <input type="text" value={formData.remark} onChange={(e) => setFormData({...formData, remark: e.target.value})}
-                  className="w-full px-6 py-4 bg-slate-50 border rounded-2xl font-bold text-slate-600 outline-none" placeholder="Remark (e.g. Brokerage top-up)" />
-                <button type="submit" className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-100 active:scale-[0.98]">
+                  className="w-full px-6 py-4 bg-slate-50 border rounded-2xl font-bold text-slate-600 outline-none" placeholder="Remark (Optional)" />
+                <button type="submit" className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-lg shadow-xl active:scale-[0.98]">
                   SAVE TRANSACTION
                 </button>
               </form>
